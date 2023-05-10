@@ -6,23 +6,56 @@ library(gargle)
 library(DT)
 library(shinydashboard)
 library(flexdashboard)
+library(tidyr)
+# 
+# sheet_url1 <- "https://docs.google.com/spreadsheets/d/1unFxjUoR1Fk92PCWQQ6h4DAYQbgrXzD3sX6jSxlHnw0/export?format=csv&gid=0"
+# sheet_url2 <- "https://docs.google.com/spreadsheets/d/1PJ9BktJdDX3LJmYgBCxKf5B6DuxIpRLd/export?format=csv&gid=1403943995"
+# sheet_url3 <- "https://docs.google.com/spreadsheets/d/14Hrkn7Tisj5yPHE1mRgYOyKxJFjtUKT_J9VCAEh7M-E/export?format=csv&gid=0"
+# 
+# data1 <- readr::read_csv(sheet_url1)
+# data2 <- readr::read_csv(sheet_url2)
+# data3 <- readr::read_csv(sheet_url3)
 
-sheet_url1 <- "https://docs.google.com/spreadsheets/d/1unFxjUoR1Fk92PCWQQ6h4DAYQbgrXzD3sX6jSxlHnw0/edit#gid=0"
-sheet_url2 <- "https://docs.google.com/spreadsheets/d/1PJ9BktJdDX3LJmYgBCxKf5B6DuxIpRLd/export?format=csv&gid=1403943995"
-sheet_url3 <- "https://docs.google.com/spreadsheets/d/14Hrkn7Tisj5yPHE1mRgYOyKxJFjtUKT_J9VCAEh7M-E/export?format=csv&gid=0"
+# Google Sheet URL
+sheet_url_main <- "https://docs.google.com/spreadsheets/d/1KxFzf-pVIudzWF9NVPZgzGw2v9KYmMnwIRV5WGeP4Mg/export?format=csv&gid=0"
 
-data1 <- read_sheet(sheet_url1)
-data2 <- readr::read_csv(sheet_url2)
-data3 <- read_sheet(sheet_url3)
+# Read URLs from the Google Sheet
+urls_data <- readr::read_csv(sheet_url_main)
+
+# Make sure the "enlace" column is of type character
+urls_data$enlace <- as.character(urls_data$enlace)
+
+# Initialize empty data frame to store data from all URLs
+all_data <- data.frame()
+
+# Loop over each URL
+for(i in 1:nrow(urls_data)) {
+  sheet_url <- urls_data[i, "enlace"]
+  data <- readr::read_csv(sheet_url$enlace)
+  all_data <- rbind(all_data, data)
+}
+
+# Assuming all_data is your combined data frame
+new_dataframe <- all_data %>%
+  group_by(`Investigador Principal`, `Estado de cumplimiento`) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = `Estado de cumplimiento`, values_from = count, values_fill = 0) %>% 
+  tidyr::drop_na()
+
+# Display the new data frame
+print(new_dataframe)
+
+
+# Display the new data frame
+print(new_dataframe)
+
 
 ui <- dashboardPage(
   dashboardHeader(title = "Margaret Inside - Research Progress Tracker"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
-      menuItem("Widgets", tabName = "widgets", icon = icon("th")),
       menuItem("Data", tabName = "data", icon = icon("table")),
-      menuItem("Cumplimiento", tabName = "cumplimiento", icon = icon("check-circle"))
+      menuItem("Summary", tabName = "summary", icon = icon("list")) # New tab
     )
   ),
   dashboardBody(
@@ -47,87 +80,28 @@ ui <- dashboardPage(
       # Data tab content
       tabItem(tabName = "data",
               fluidRow(
-                box(DT::dataTableOutput("researchDataTable1", height = "auto"), width = 12),
-                fluidRow(tags$hr()), # Agregar una fila separadora
-                box(DT::dataTableOutput("researchDataTable2", height = "auto"), width = 12),
-                fluidRow(tags$hr()), # Agregar una fila separadora
-                box(DT::dataTableOutput("researchDataTable3", height = "auto"), width = 12),
+                box(DT::dataTableOutput("researchDataTable", height = "auto"), width = 12)
               )
       ),
       
-      # Cumplimiento tab content
-      tabItem(tabName = "cumplimiento",
+      tabItem(tabName = "summary",
               fluidRow(
-                box(title = "Cumplimiento - SHARIK JIMENA GUZMAN ARROYO", 
-                    flexdashboard::gaugeOutput("cumplimientoGauge"), 
-                    width = 6
-                ),
-                box(title = "Cumplimiento - SEBASTIAN ROBLEDO GIRALDO", 
-                    flexdashboard::gaugeOutput("cumplimientoGauge2"), 
-                    width = 6
-                ),
-                box(title = "Cumplimiento - PEPITO PEREZ", 
-                    flexdashboard::gaugeOutput("cumplimientoGauge3"), 
-                    width = 6
-                )
+                box(DT::dataTableOutput("summaryTable", height = "auto"), width = 12)
               )
-      )
     )
   )
 )
+)
 
 server <- function(input, output) {
-  output$researchDataTable1 <- DT::renderDataTable({
-    datatable(data1, options = list(pageLength = 25, scrollX = TRUE)) 
+  output$researchDataTable <- DT::renderDataTable({
+    datatable(all_data, options = list(pageLength = 25, scrollX = TRUE)) 
+  })
+  output$summaryTable <- DT::renderDataTable({
+    datatable(new_dataframe, options = list(pageLength = 25, scrollX = TRUE)) 
   })
   
-  output$researchDataTable2 <- DT::renderDataTable({
-    datatable(data2, options = list(pageLength = 25, scrollX = TRUE)) 
-  })
-  
-  output$researchDataTable3 <- DT::renderDataTable({
-    datatable(data3, options = list(pageLength = 25, scrollX = TRUE)) 
-  })
-  
-  cumplimiento_percentage <- reactive({
-    total_rows <- nrow(data1)
-    cumplimiento_final_count <- sum(data1$"Estado de cumplimiento" == "Cumplimiento final")
-    percentage <- (cumplimiento_final_count / total_rows) * 100
-    return(percentage)
-  })
-  
-  output$cumplimientoGauge <- flexdashboard::renderGauge({
-    gauge(value = cumplimiento_percentage(), min = 0, max = 100, symbol = "%", 
-          label = "Porcentaje de cumplimiento final", 
-          gaugeSectors(success = c(80, 100), warning = c(50, 79), danger = c(0, 49)))
-  }) 
-  
-  cumplimiento_percentage2 <- reactive({
-    total_rows <- nrow(data2)
-    cumplimiento_final_count <- sum(data2$"Estado de cumplimiento" == "Cumplimiento final")
-    percentage <- (cumplimiento_final_count / total_rows) * 100
-    return(percentage)
-  })
-  
-  output$cumplimientoGauge2 <- flexdashboard::renderGauge({
-    gauge(value = cumplimiento_percentage2(), min = 0, max = 100, symbol = "%", 
-          label = "Porcentaje de cumplimiento final", 
-          gaugeSectors(success = c(80, 100), warning = c(50, 79), danger = c(0, 49)))
-  }) 
-  
-  cumplimiento_percentage3 <- reactive({
-    total_rows <- nrow(data3)
-    cumplimiento_final_count <- sum(data3$"Estado de cumplimiento" == "Cumplimiento final")
-    percentage <- (cumplimiento_final_count / total_rows) * 100
-    return(percentage)
-  })
-  
-  output$cumplimientoGauge3 <- flexdashboard::renderGauge({
-    gauge(value = cumplimiento_percentage3(), min = 0, max = 100, symbol = "%", 
-          label = "Porcentaje de cumplimiento final", 
-          gaugeSectors(success = c(80, 100), warning = c(50, 79), danger = c(0, 49)))
-  })
-  
+  # Rest of your server code...
 }
 
 shinyApp(ui = ui, server = server)
