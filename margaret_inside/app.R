@@ -1,107 +1,190 @@
 library(shiny)
-library(googlesheets4)
-library(dplyr)
-library(ggplot2)
-library(gargle)
-library(DT)
 library(shinydashboard)
-library(flexdashboard)
-library(tidyr)
-# 
-# sheet_url1 <- "https://docs.google.com/spreadsheets/d/1unFxjUoR1Fk92PCWQQ6h4DAYQbgrXzD3sX6jSxlHnw0/export?format=csv&gid=0"
-# sheet_url2 <- "https://docs.google.com/spreadsheets/d/1PJ9BktJdDX3LJmYgBCxKf5B6DuxIpRLd/export?format=csv&gid=1403943995"
-# sheet_url3 <- "https://docs.google.com/spreadsheets/d/14Hrkn7Tisj5yPHE1mRgYOyKxJFjtUKT_J9VCAEh7M-E/export?format=csv&gid=0"
-# 
-# data1 <- readr::read_csv(sheet_url1)
-# data2 <- readr::read_csv(sheet_url2)
-# data3 <- readr::read_csv(sheet_url3)
+library(dplyr)
+library(readr)
 
-# Google Sheet URL
-sheet_url_main <- "https://docs.google.com/spreadsheets/d/1KxFzf-pVIudzWF9NVPZgzGw2v9KYmMnwIRV5WGeP4Mg/export?format=csv&gid=0"
+proyectos_2017 <- read_csv("https://docs.google.com/spreadsheets/d/1aSS-VUlN0N0BwOlyd8cbPVyOqsmmAwE8jLFut21eqo0/export?format=csv&gid=1021110299")
+producto_esperado <- read_csv("https://docs.google.com/spreadsheets/d/1aSS-VUlN0N0BwOlyd8cbPVyOqsmmAwE8jLFut21eqo0/export?format=csv&gid=1600566319")
+adscripcion <- read_csv("https://docs.google.com/spreadsheets/d/1aSS-VUlN0N0BwOlyd8cbPVyOqsmmAwE8jLFut21eqo0/export?format=csv&gid=932379407")
 
-# Read URLs from the Google Sheet
-urls_data <- readr::read_csv(sheet_url_main)
-
-# Make sure the "enlace" column is of type character
-urls_data$enlace <- as.character(urls_data$enlace)
-
-# Initialize empty data frame to store data from all URLs
-all_data <- data.frame()
-
-# Loop over each URL
-for(i in 1:nrow(urls_data)) {
-  sheet_url <- urls_data[i, "enlace"]
-  data <- readr::read_csv(sheet_url$enlace)
-  all_data <- rbind(all_data, data)
-}
-
-# Assuming all_data is your combined data frame
-new_dataframe <- all_data %>%
-  group_by(`Investigador Principal`, `Estado de cumplimiento`) %>%
-  summarise(count = n(), .groups = "drop") %>%
-  tidyr::pivot_wider(names_from = `Estado de cumplimiento`, values_from = count, values_fill = 0) %>% 
-  tidyr::drop_na()
-
-# Display the new data frame
-print(new_dataframe)
-
-
-# Display the new data frame
-print(new_dataframe)
-
+usuarios <- data.frame(
+  usuario = c("usuario1", "usuario2"),
+  contraseña = c("contraseña1", "contraseña2")
+)
 
 ui <- dashboardPage(
-  dashboardHeader(title = "Margaret Inside - Research Progress Tracker"),
-  dashboardSidebar(
-    sidebarMenu(
-      menuItem("Data", tabName = "data", icon = icon("table")),
-      menuItem("Summary", tabName = "summary", icon = icon("list")) # New tab
-    )
-  ),
+  dashboardHeader(title = "Inicio de Sesión"),
+  dashboardSidebar(),
   dashboardBody(
-    tabItems(
-      # First tab content
-      tabItem(tabName = "dashboard",
-              fluidRow(
-                box(plotOutput("plot1", height = 250)),
-                
-                box(
-                  title = "Controls",
-                  sliderInput("slider", "Number of observations:", 1, 100, 50)
-                )
-              )
-      ),
-      
-      # Second tab content
-      tabItem(tabName = "widgets",
-              h2("Widgets tab content")
-      ), 
-      
-      # Data tab content
-      tabItem(tabName = "data",
-              fluidRow(
-                box(DT::dataTableOutput("researchDataTable", height = "auto"), width = 12)
-              )
-      ),
-      
-      tabItem(tabName = "summary",
-              fluidRow(
-                box(DT::dataTableOutput("summaryTable", height = "auto"), width = 12)
-              )
-    )
+    uiOutput("pagina_redireccionada")
   )
 )
-)
 
-server <- function(input, output) {
-  output$researchDataTable <- DT::renderDataTable({
-    datatable(all_data, options = list(pageLength = 25, scrollX = TRUE)) 
-  })
-  output$summaryTable <- DT::renderDataTable({
-    datatable(new_dataframe, options = list(pageLength = 25, scrollX = TRUE)) 
+server <- function(input, output, session) {
+  # Estado del inicio de sesión
+  login_status <- reactiveVal(FALSE)
+  
+  # Función para verificar el inicio de sesión
+  verificarInicioSesion <- function(usuario, contraseña) {
+    usuario_valido <- usuarios$usuario == usuario
+    contraseña_valida <- usuarios$contraseña == contraseña
+    if (sum(usuario_valido & contraseña_valida) > 0) {
+      return(TRUE)
+    } else {
+      return(FALSE)
+    }
+  }
+  
+  # Acciones para el botón de inicio de sesión
+  observeEvent(input$login, {
+    usuario <- input$usuario
+    contraseña <- input$contraseña
+    if (verificarInicioSesion(usuario, contraseña)) {
+      showModal(modalDialog(
+        title = "Inicio de sesión",
+        "Inicio de sesión exitoso",
+        easyClose = TRUE
+      ))
+      login_status(TRUE)
+    } else {
+      showModal(modalDialog(
+        title = "Inicio de sesión",
+        "Usuario o contraseña incorrectos",
+        easyClose = TRUE
+      ))
+    }
   })
   
-  # Rest of your server code...
+  # Acciones para el botón de registro
+  observeEvent(input$registro, {
+    showModal(modalDialog(
+      title = "Registro",
+      "Acción de registro",
+      easyClose = TRUE
+    ))
+  })
+  
+  # Página redireccionada
+  output$pagina_redireccionada <- renderUI({
+    if (login_status()) {
+      fluidPage(
+        titlePanel("Project Data Explorer"),
+        sidebarLayout(
+          sidebarPanel(
+            selectInput("project_id", "Select Project ID:", choices = unique(proyectos_2017$ID_PROYECTO))
+          ),
+          mainPanel(
+            tabsetPanel(
+              tabPanel("Proyectos", tableOutput("proyectos_table")),
+              tabPanel("Producto Esperado", tableOutput("producto_table")),
+              tabPanel("Adscripcion", tableOutput("adscripcion_table"))
+            )
+          )
+        )
+      )
+    } else {
+      fluidPage(
+        fluidRow(
+          column(width = 4, offset = 4,
+                 box(
+                   title = "Iniciar Sesión",
+                   solidHeader = TRUE,
+                   width = 12,
+                   align = "center",
+                   div(
+                     id = "login-box",
+                     tags$head(tags$style(HTML("
+              body {
+                background-color: #f8f9fa;
+              }
+              .login-box {
+                max-width: 400px;
+                margin: 0 auto;
+                background-color: #fff;
+                border: 1px solid #ddd;
+                padding: 20px;
+                margin-top: 50px;
+                box-shadow: 0px 2px 10px rgba(0,0,0,0.1);
+              }
+              .login-box .form-control {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+                margin-bottom: 10px;
+              }
+              .login-box .btn {
+                padding: 10px 16px;
+                font-size: 16px;
+                width: 48%;
+              }
+              .login-box .btn-primary {
+                background-color: #007BFF;
+                border-color: #007BFF;
+                color: #fff;
+              }
+              .login-box .btn-primary:hover {
+                background-color: #0069D9;
+                border-color: #0069D9;
+              }
+              .login-box .btn-success {
+                background-color: #28A745;
+                border-color: #28A745;
+                color: #fff;
+              }
+              .login-box .btn-success:hover {
+                background-color: #218838;
+                border-color: #218838;
+              }
+              .login-box .icon {
+                display: inline-block;
+                vertical-align: middle;
+                margin-right: 5px;
+              }
+              .login-box .icon i {
+                font-size: 20px;
+              }
+            "))),
+                     tags$div(
+                       style = "text-align: center;",
+                       tags$div(
+                         class = "icon",
+                         tags$i(class = "fas fa-user-circle"),
+                         textInput("usuario", NULL, placeholder = "Usuario", value = "")
+                       ),
+                       tags$div(
+                         class = "icon",
+                         tags$i(class = "fas fa-lock"),
+                         passwordInput("contraseña", NULL, placeholder = "Contraseña", value = "")
+                       )
+                     ),
+                     br(),
+                     tags$div(
+                       style = "display: flex; justify-content: space-between;",
+                       actionButton("login", "Iniciar sesión", class = "btn btn-primary", style = "width: 48%;"),
+                       actionButton("registro", "Registrarse", class = "btn btn-success", style = "width: 48%;")
+                     )
+                   )
+                 )
+          )
+        )
+      )
+    }
+  })
+  
+  # Filter data based on selected project ID
+  selected_project <- reactive({
+    id <- input$project_id
+    list(
+      proyectos = proyectos_2017[proyectos_2017$ID_PROYECTO == id, ],
+      producto = producto_esperado[producto_esperado$ID_PROYECTO == id, ],
+      adscripcion = adscripcion[adscripcion$ID_PROYECTO == id, ]
+    )
+  })
+  
+  # Generate tables for display
+  output$proyectos_table <- renderTable({ selected_project()$proyectos })
+  output$producto_table <- renderTable({ selected_project()$producto })
+  output$adscripcion_table <- renderTable({ selected_project()$adscripcion })
 }
 
 shinyApp(ui = ui, server = server)
